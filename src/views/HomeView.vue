@@ -42,7 +42,7 @@
         <v-card class="pa-4">
           <div class="text-h6 mb-4">Usuarios</div>
           <!-- Componente que pinta la tabla -->
-          <UsersList :search-term="search" />
+          <UsersList ref="usersListRef" :search-term="search" />
         </v-card>
       </v-col>
     </v-row>
@@ -58,11 +58,15 @@ type User = { id:number; nombre:string; email:string; rol:'admin'|'usuario' }
 
 const router = useRouter()
 const search = ref('')
-
+const usersListRef = ref<InstanceType<typeof UsersList>>()
 const user = ref<User | null>(null)
 onMounted(() => {
   const raw = localStorage.getItem('user')
   user.value = raw ? JSON.parse(raw) as User : null
+
+  if (usersListRef.value) {
+    usersListRef.value.fetchUsers()
+  }
 })
 
 const isAdmin = computed(() => user.value?.rol === 'admin')

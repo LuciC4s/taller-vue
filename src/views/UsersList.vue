@@ -39,6 +39,8 @@ const fetchUsers = async () => {
   }
 }
 
+defineExpose({ fetchUsers })
+
 onMounted(fetchUsers)
 
 const filtered = computed(() => {
