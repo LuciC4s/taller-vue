@@ -4,6 +4,22 @@
       <!-- Sidebar -->
       <v-col cols="12" md="3">
         <v-card class="pa-4">
+          <div class="text-subtitle-1 mb-2">Navegación</div>
+          <v-list density="compact" class="pa-0">
+            <v-list-item
+              prepend-icon="mdi-account-group"
+              title="Usuarios"
+              :active="$route.name === 'usuarios'"
+              @click="goToUsers"
+            />
+            <v-list-item
+              prepend-icon="mdi-clipboard-list"
+              title="Tareas"
+              :active="$route.name === 'tareas'"
+              @click="goToTasks"
+            />
+          </v-list>
+          <v-divider class="my-4" />
           <div class="text-subtitle-1 mb-2">Acciones</div>
 
           <!-- Agregar usuario: habilitado solo si es admin -->
@@ -14,6 +30,8 @@
           >
             Agregar usuario
           </v-btn>
+
+          <v-btn block color="success" class="mb-3"  @click="goAddTask"> Nueva tarea </v-btn>
 
           <!-- Buscar (filtra en UsersList) -->
           <v-text-field
@@ -72,6 +90,9 @@ onMounted(() => {
 const isAdmin = computed(() => user.value?.rol === 'admin')
 
 const goAddUser = () => router.push('/usuarios/nuevo')
+const goToUsers = () => router.push('/usuarios')
+const goToTasks = () => router.push('/tareas')
+const goAddTask = () => router.push('/tareas/nueva')
 
 const logout = () => {
   localStorage.removeItem('token')
