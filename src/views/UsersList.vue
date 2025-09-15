@@ -1,6 +1,6 @@
 <template>
   <v-data-table
-    :items="filtered"
+    :items="formattedUsers"
     :headers="headers"
     :loading="loading"
     class="elevation-1"
@@ -15,7 +15,7 @@
 import { ref, onMounted, computed } from 'vue'
 import api from '@/services/api'
 
-type Usuario = { id:number; nombre:string; email:string; rol:'admin'|'usuario' }
+type Usuario = { id:number; nombre:string; email:string; rol:'admin'|'usuario' ;created_at:string; updated_at: string}
 
 const props = defineProps<{ searchTerm?: string }>()
 
@@ -26,6 +26,7 @@ const headers = [
   { title: 'Nombre', value: 'nombre' },
   { title: 'Email',  value: 'email' },
   { title: 'Rol',    value: 'rol' },
+  { title: 'Fecha de Creación', value: 'created_at' }
 ]
 
 // carga desde la API
@@ -53,6 +54,18 @@ const filtered = computed(() => {
   )
 })
 
-// recargar si quieres al cambiar término (opcional)
-/* watch(() => props.searchTerm, () => { ... }) */
+const formattedUsers = computed(() => {
+  return filtered.value.map(user => ({
+    ...user,
+    created_at: new Date(user.created_at).toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }))
+})
+
+
 </script>
