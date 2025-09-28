@@ -52,10 +52,10 @@
           <v-card-text>
             <v-row class="mb-4">
               <v-col cols="12" md="4">
-                <v-select  v-model="filters.estado"  :items="estadoOptions" label="Filtrar por Estado" clearable variant="outlined" density="compact" @update:model-value="loadTasks" />
+                <v-select  v-model="filters.estado"  :items="estadoOptions" label="Filtrar por Estado" clearable variant="outlined" density="compact" />
               </v-col>
               <v-col cols="12" md="4">
-                <v-select  v-model="filters.usuario_id" :items="userOptions" label="Filtrar por Usuario" clearable variant="outlined" density="compact" @update:model-value="loadTasks" />
+                <v-select  v-model="filters.usuario_id" :items="userOptions" label="Filtrar por Usuario" clearable variant="outlined" density="compact" />
               </v-col>
               <v-col cols="12" md="4" class="d-flex justify-end align-center">
                 <v-btn color="primary" variant="elevated" prepend-icon="mdi-plus" @click="goToCreateTask">
@@ -64,7 +64,7 @@
               </v-col>
             </v-row>
 
-            <v-data-table :headers="headers" :items="tasks" :loading="loading" :items-per-page="10" class="elevation-1" :search="search" >
+            <v-data-table :headers="headers" :items="filteredTasks" :loading="loading" :items-per-page="10" class="elevation-1" :search="search" >
               <template v-slot:item.estado="{ item }">
                 <v-chip
                   :color="getEstadoColor(item.estado)"
@@ -185,7 +185,7 @@ const headers = [
   { title: "Usuario Asignado", key: "usuario", sortable: false },
   { title: "Fecha Vencimiento", key: "fecha_vencimiento", sortable: true },
   { title: "Creada", key: "created_at", sortable: true },
-  { title: "Acciones", key: "actions", sortable: false, align: "center" },
+  { title: "Acciones", key: "actions", sortable: false, align: "center" as const },
 ];
 
 const estadoOptions = [
@@ -203,6 +203,20 @@ const userOptions = computed(() =>
 
 const isAdmin = computed(() => user.value?.rol === "admin");
 
+const filteredTasks = computed(() => {
+  let filtered = tasks.value;
+
+  if (filters.estado) {
+    filtered = filtered.filter(task => task.estado === filters.estado);
+  }
+
+  if (filters.usuario_id) {
+    filtered = filtered.filter(task => task.usuario_id === filters.usuario_id);
+  }
+
+  return filtered;
+});
+
 const loadUsers = async () => {
   try {
     const response = await userApi.getAllUsers();
@@ -215,17 +229,19 @@ const loadUsers = async () => {
 const loadTasks = async () => {
   try {
     loading.value = true;
-    let response;
-
-    if (filters.estado) {
-      response = await taskApi.getTasksByStatus(filters.estado as any);
-    } else if (filters.usuario_id) {
-      response = await taskApi.getTasksByUser(filters.usuario_id);
+    const response = await taskApi.getAllTasks();
+    
+    const data = response.data;
+    if (data && data.success && Array.isArray(data.data)) {
+      tasks.value = data.data;
+    } else if (data && Array.isArray(data)) {
+      tasks.value = data;
+    } else if (data && data.data && Array.isArray(data.data)) {
+      tasks.value = data.data;
     } else {
-      response = await taskApi.getAllTasks();
+      console.error('Estructura de respuesta inesperada:', data);
+      tasks.value = [];
     }
-
-    tasks.value = response.data.data || [];
   } catch (error) {
     console.error("Error loading tasks:", error);
     tasks.value = [];
