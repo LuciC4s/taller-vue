@@ -135,7 +135,12 @@ const form = reactive({
 const valid = ref(false)
 const loading = ref(false)
 const loadingUsers = ref(false)
-const users = ref<Array<{ id: number; nombre: string; email: string }>>([])
+const users = ref<Array<{ 
+  id: number
+  nombre: string
+  email: string
+  tenant_id?: string
+}>>([])
 const formRef = ref()
 
 const isEditing = computed(() => !!taskId.value)
@@ -165,9 +170,21 @@ const loadUsers = async () => {
   try {
     loadingUsers.value = true
     const response = await userApi.getAllUsers()
-    users.value = response.data || []
+    const data = response.data
+    
+    if (data && data.success && Array.isArray(data.data)) {
+      users.value = data.data
+    } else if (data && Array.isArray(data)) {
+      users.value = data
+    } else if (data && data.data && Array.isArray(data.data)) {
+      users.value = data.data
+    } else {
+      console.error('Estructura de respuesta inesperada:', data)
+      users.value = []
+    }
   } catch (error) {
     console.error('Error loading users:', error)
+    users.value = []
   } finally {
     loadingUsers.value = false
   }

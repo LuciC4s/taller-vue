@@ -15,7 +15,15 @@
 import { ref, onMounted, computed } from 'vue'
 import api from '@/services/api'
 
-type Usuario = { id:number; nombre:string; email:string; rol:'admin'|'usuario' ;created_at:string; updated_at: string}
+type Usuario = { 
+  id: number
+  nombre: string
+  email: string
+  rol: 'admin' | 'usuario'
+  created_at: string
+  updated_at: string
+  tenant_id?: string
+}
 
 const props = defineProps<{ searchTerm?: string }>()
 
@@ -26,15 +34,29 @@ const headers = [
   { title: 'Nombre', value: 'nombre' },
   { title: 'Email',  value: 'email' },
   { title: 'Rol',    value: 'rol' },
+  { title: 'Tenant', value: 'tenant_id' },
   { title: 'Fecha de Creación', value: 'created_at' }
 ]
 
-// carga desde la API
 const fetchUsers = async () => {
   loading.value = true
   try {
-    const { data } = await api.get<Usuario[]>('/usuarios/listUsers')
-    items.value = data
+    const response = await api.get('/usuarios/listUsers')
+    const data = response.data
+    
+    if (data && data.success && Array.isArray(data.data)) {
+      items.value = data.data
+    } else if (data && Array.isArray(data)) {
+      items.value = data
+    } else if (data && data.data && Array.isArray(data.data)) {
+      items.value = data.data
+    } else {
+      console.error('Estructura de respuesta inesperada:', data)
+      items.value = []
+    }
+  } catch (error) {
+    console.error('Error al cargar usuarios:', error)
+    items.value = []
   } finally {
     loading.value = false
   }
@@ -46,7 +68,13 @@ onMounted(fetchUsers)
 
 const filtered = computed(() => {
   const q = (props.searchTerm || '').toLowerCase().trim()
-  if (!q) return items.value
+  if (!q) return items.value || []
+  
+  if (!Array.isArray(items.value)) {
+    console.warn('items.value no es un array:', items.value)
+    return []
+  }
+  
   return items.value.filter(u =>
     u.nombre.toLowerCase().includes(q) ||
     u.email.toLowerCase().includes(q)  ||
@@ -55,6 +83,11 @@ const filtered = computed(() => {
 })
 
 const formattedUsers = computed(() => {
+  if (!Array.isArray(filtered.value)) {
+    console.warn('filtered.value no es un array:', filtered.value)
+    return []
+  }
+  
   return filtered.value.map(user => ({
     ...user,
     created_at: new Date(user.created_at).toLocaleDateString('es-ES', {
