@@ -1,3 +1,4 @@
+<template>
 <v-container fluid>
     <v-row justify="center">
       <v-col cols="12" md="8" lg="6">
@@ -17,14 +18,19 @@
             />
 
             <v-text-field
-              v-model="form.email"
+              v-model="form.emailLocal"
               label="Email"
-              type="email"
-              :rules="emailRules"
+              :rules="emailLocalRules"
               required
               variant="outlined"
               class="mb-4"
-            />
+              :hint="emailHint"
+              persistent-hint
+            >
+              <template v-slot:append>
+                <span class="text-grey">@{{ currentTenantDomain }}</span>
+              </template>
+            </v-text-field>
 
             <v-text-field
               v-model="form.password"
@@ -79,11 +85,11 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import api from '@/services/api'
+import api, { getCurrentTenant } from '@/services/api'
 
 type UserForm = {
   nombre: string
-  email: string
+  emailLocal: string
   password: string
   rol: 'admin' | 'usuario'
 }
@@ -98,12 +104,25 @@ const loading = ref(false)
 
 const form = reactive<UserForm>({
   nombre: '',
-  email: '',
+  emailLocal: '',
   password: '',
   rol: 'usuario'
 })
 
 const isEditing = computed(() => !!props.id || !!route.params.id)
+
+const currentTenant = computed(() => getCurrentTenant())
+const currentTenantDomain = computed(() => `${currentTenant.value}.com`)
+
+const fullEmail = computed(() => {
+  if (!form.emailLocal.trim()) return ''
+  return `${form.emailLocal.trim()}@${currentTenantDomain.value}`
+})
+
+const emailHint = computed(() => {
+  if (!form.emailLocal.trim()) return 'Solo ingresa la parte antes del @'
+  return `Email completo: ${fullEmail.value}`
+})
 
 const rolOptions = [
   { title: 'Usuario', value: 'usuario' },
@@ -115,14 +134,19 @@ const nombreRules = [
   (v: string) => (v && v.length >= 2) || 'El nombre debe tener al menos 2 caracteres'
 ]
 
-const emailRules = [
+const emailLocalRules = [
   (v: string) => !!v || 'El email es requerido',
-  (v: string) => /.+@.+\..+/.test(v) || 'El email debe ser válido'
+  (v: string) => (v && v.length >= 2) || 'El email debe tener al menos 2 caracteres',
+  (v: string) => !v.includes('@') || 'No incluyas el símbolo @, solo la parte antes del dominio',
+  (v: string) => /^[a-zA-Z0-9._-]+$/.test(v) || 'Solo se permiten letras, números, puntos, guiones y guiones bajos',
+  (v: string) => !v.startsWith('.') || 'El email no puede empezar con punto',
+  (v: string) => !v.endsWith('.') || 'El email no puede terminar con punto',
+  (v: string) => !v.includes('..') || 'No se permiten puntos consecutivos'
 ]
 
 const passwordRules = [
   (v: string) => {
-    if (isEditing.value) return true // Password is optional when editing
+    if (isEditing.value) return true
     return !!v || 'La contraseña es requerida'
   },
   (v: string) => {
@@ -142,7 +166,7 @@ const submitForm = async () => {
   try {
     const payload = {
       nombre: form.nombre,
-      email: form.email,
+      email: fullEmail.value,
       password: form.password,
       rol: form.rol
     }
@@ -152,7 +176,7 @@ const submitForm = async () => {
     } else {
       await api.post('/usuarios/addUser', payload)
       
-      console.log('Usuario creado exitosamente')
+      console.log('Usuario creado exitosamente con email:', fullEmail.value)
       
       router.push('/usuarios')
     }
