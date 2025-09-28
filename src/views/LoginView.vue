@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import api from '@/services/api'
+import { loginWithTenantDetection } from '@/services/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -47,8 +47,7 @@ const onSubmit = async () => {
     errorMsg.value = ''
     loading.value = true
     try {
-        // Llamada a tu endpoint
-        const { data } = await api.post('/login', {
+        const { data } = await loginWithTenantDetection({
             email: email.value,
             password: password.value,
         })
