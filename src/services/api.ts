@@ -1,21 +1,106 @@
 import axios from 'axios'
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api',
-})
-
-
-api.interceptors.request.use((config) => {
-  // rutas que no deben llevar token
-  const noAuthEndpoints = ['/login', '/register']
-
-  if (!noAuthEndpoints.includes(config.url || '')) {
-    const token = localStorage.getItem('token')
-    if (token) config.headers.Authorization = `Bearer ${token}`
+function getTenantFromEmail(email: string): string {
+  const domain = email.split('@')[1]?.toLowerCase()
+  
+  const emailToTenantMap: Record<string, string> = {
+    'empresa1.com': 'empresa1',
+    'empresa1.midominio.com': 'empresa1',
+    'empresa2.com': 'empresa2', 
+    'empresa2.midominio.com': 'empresa2'
   }
+  
+  return emailToTenantMap[domain || ''] || 'empresa1'
+}
 
-  return config
-})
+function getCurrentTenant(): string {
+  return localStorage.getItem('current_tenant') || 'empresa1'
+}
+
+function getApiBaseURL(tenantId: string): string {
+  return `http://${tenantId}.midominio.com:8000/api`
+}
+
+function createApiInstance(tenantId?: string) {
+  const currentTenant = tenantId || getCurrentTenant()
+  const baseURL = getApiBaseURL(currentTenant)
+  
+  return axios.create({
+    baseURL,
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  })
+}
+
+const api = createApiInstance()
+
+api.interceptors.request.use(
+  (config) => {
+    const currentTenant = getCurrentTenant()
+    config.baseURL = getApiBaseURL(currentTenant)
+    
+    const noAuthEndpoints = ['/login', '/register']
+    
+    if (!noAuthEndpoints.includes(config.url || '')) {
+      const token = localStorage.getItem('token')
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
+    }
+    
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
+export async function loginWithTenantDetection(credentials: { email: string; password: string }) {
+  const tenantId = getTenantFromEmail(credentials.email)
+  const tenantApi = createApiInstance(tenantId)
+  
+  tenantApi.interceptors.request.use((config) => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  })
+  
+  try {
+    const response = await tenantApi.post('/login', credentials)
+    
+    localStorage.setItem('current_tenant', tenantId)
+    
+    api.defaults.baseURL = getApiBaseURL(tenantId)
+    
+    return response
+  } catch (error) {
+    throw error
+  }
+}
+
+export function initializeApiWithTenant() {
+  const currentTenant = getCurrentTenant()
+  api.defaults.baseURL = getApiBaseURL(currentTenant)
+  return currentTenant
+}
+
+export { getTenantFromEmail, getApiBaseURL, createApiInstance, getCurrentTenant }
 
 export const taskApi = {
 
@@ -73,7 +158,17 @@ export const authApi = {
   login: (credentials: { email: string; password: string }) => 
     api.post('/login', credentials),
   
-  logout: () => api.post('/logout')
+  register: (userData: {
+    nombre: string
+    email: string
+    password: string
+    password_confirmation: string
+    rol?: string
+  }) => api.post('/register', userData),
+  
+  logout: () => api.post('/logout'),
+  
+  getUser: () => api.get('/user')
 }
 
 export default api
