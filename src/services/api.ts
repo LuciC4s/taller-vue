@@ -1,5 +1,7 @@
 import axios from 'axios'
 
+const API_BASE_URL = '/api'
+
 function getTenantFromEmail(email: string): string {
   const domain = email.split('@')[1]?.toLowerCase()
   
@@ -17,29 +19,23 @@ function getCurrentTenant(): string {
   return localStorage.getItem('current_tenant') || 'empresa1'
 }
 
-function getApiBaseURL(tenantId: string): string {
-  return `http://${tenantId}.midominio.com:8000/api`
+function getTenantDomain(tenantId: string): string {
+  return `${tenantId}.midominio.com`
 }
 
-function createApiInstance(tenantId?: string) {
-  const currentTenant = tenantId || getCurrentTenant()
-  const baseURL = getApiBaseURL(currentTenant)
-  
-  return axios.create({
-    baseURL,
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
-  })
-}
-
-const api = createApiInstance()
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+})
 
 api.interceptors.request.use(
   (config) => {
     const currentTenant = getCurrentTenant()
-    config.baseURL = getApiBaseURL(currentTenant)
+    
+    config.headers['X-Tenant'] = currentTenant
     
     const noAuthEndpoints = ['/login', '/register']
     
@@ -71,22 +67,17 @@ api.interceptors.response.use(
 
 export async function loginWithTenantDetection(credentials: { email: string; password: string }) {
   const tenantId = getTenantFromEmail(credentials.email)
-  const tenantApi = createApiInstance(tenantId)
-  
-  tenantApi.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  })
   
   try {
-    const response = await tenantApi.post('/login', credentials)
+    const response = await axios.post(`${API_BASE_URL}/login`, credentials, {
+      headers: {
+        'X-Tenant': tenantId,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    })
     
     localStorage.setItem('current_tenant', tenantId)
-    
-    api.defaults.baseURL = getApiBaseURL(tenantId)
     
     return response
   } catch (error) {
@@ -96,11 +87,10 @@ export async function loginWithTenantDetection(credentials: { email: string; pas
 
 export function initializeApiWithTenant() {
   const currentTenant = getCurrentTenant()
-  api.defaults.baseURL = getApiBaseURL(currentTenant)
   return currentTenant
 }
 
-export { getTenantFromEmail, getApiBaseURL, createApiInstance, getCurrentTenant }
+export { getTenantFromEmail, getTenantDomain, getCurrentTenant }
 
 export const taskApi = {
 
